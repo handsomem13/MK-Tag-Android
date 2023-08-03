@@ -146,4 +146,12 @@
         android:overScrollMode="never"
         android:paddingLeft="10dp"
         android:paddingRight="10dp" />
+
+    <TextView
+        android:id="@+id/tv_ErrorMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="" />
+
+
 </LinearLayout>

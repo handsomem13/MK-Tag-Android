@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.ParcelUuid;
+import android.util.Log;
 
 import com.elvishew.xlog.XLog;
 import com.moko.ble.lib.utils.MokoUtils;
@@ -29,9 +30,13 @@ public final class MokoBleScanner {
     private MokoScanDeviceCallback mMokoScanDeviceCallback;
 
     private Context mContext;
-
+    private ArrayList<String> beaconList = new ArrayList<>();
     public MokoBleScanner(Context context) {
         mContext = context;
+    }
+
+    public void setBeaconList(ArrayList<String> beaconList) {
+        this.beaconList = beaconList;
     }
 
     public void startScanDevice(MokoScanDeviceCallback callback) {
@@ -48,9 +53,35 @@ public final class MokoBleScanner {
 //        ScanFilter.Builder builder = new ScanFilter.Builder();
 //        builder.setServiceData(new ParcelUuid(OrderServices.SERVICE_ADV_TRIGGER.getUuid()), null);
 //        scanFilterList.add(builder.build());
-        List<ScanFilter> scanFilterList = Collections.singletonList(new ScanFilter.Builder().build());
+        ScanFilter.Builder builder = new ScanFilter.Builder();
+        List<ScanFilter> scanFilters = new ArrayList<>();
+        if(beaconList!=null && beaconList.size()>0){
+            for (String beacon: beaconList) {
+                try {
+                    String mac = "";
+                    if (beacon.length() == 12) {
+                        StringBuffer stringBuffer = new StringBuffer(beacon);
+                        stringBuffer.insert(2, ":");
+                        stringBuffer.insert(5, ":");
+                        stringBuffer.insert(8, ":");
+                        stringBuffer.insert(11, ":");
+                        stringBuffer.insert(14, ":");
+                        mac = stringBuffer.toString();
+                    } else {
+                        mac = beacon;
+                    }
+                    Log.i("MokoLeScanHandler", "Adding " + mac + " Address to the filter");
+                    ScanFilter scanFilter = new ScanFilter.Builder()
+                            .setDeviceAddress(mac)
+                            .build();
+                    scanFilters.add(scanFilter);
+                }catch (Exception e){
+                    Log.e("MokoLeScanHandler", e.toString());
+                }
+            }
+        }
         mMokoLeScanHandler = new MokoLeScanHandler(callback);
-        scanner.startScan(scanFilterList, settings, mMokoLeScanHandler);
+        scanner.startScan(scanFilters, settings, mMokoLeScanHandler);
         callback.onStartScan();
     }
 

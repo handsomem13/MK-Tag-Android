@@ -1,11 +1,10 @@
 package com.moko.bxp.tag.activity;
 
-
+import com.google.gson.JsonObject;
 import android.app.FragmentManager;
 import android.app.ProgressDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothGattCharacteristic;
-import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -13,6 +12,7 @@ import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.widget.FrameLayout;
@@ -30,6 +30,9 @@ import com.moko.ble.lib.event.OrderTaskResponseEvent;
 import com.moko.ble.lib.task.OrderTask;
 import com.moko.ble.lib.task.OrderTaskResponse;
 import com.moko.ble.lib.utils.MokoUtils;
+import com.moko.bxp.sethala.clients.DfuMqttClient;
+import com.moko.bxp.sethala.database.BeaconInformationModel;
+import com.moko.bxp.sethala.sqlite.BeaconDatabaseHelper;
 import com.moko.bxp.tag.AppConstants;
 import com.moko.bxp.tag.R;
 import com.moko.bxp.tag.dialog.AlertMessageDialog;
@@ -39,6 +42,7 @@ import com.moko.bxp.tag.dialog.ModifyPasswordDialog;
 import com.moko.bxp.tag.fragment.DeviceFragment;
 import com.moko.bxp.tag.fragment.SettingFragment;
 import com.moko.bxp.tag.fragment.SlotFragment;
+import com.moko.bxp.tag.utils.FileDownloader;
 import com.moko.bxp.tag.utils.FileUtils;
 import com.moko.bxp.tag.utils.ToastUtils;
 import com.moko.support.MokoSupport;
@@ -57,13 +61,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.concurrent.ExecutionException;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 
 public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnCheckedChangeListener {
     public static final int REQUEST_CODE_SELECT_FIRMWARE = 0x10;
-
+    final String TAG = "DeviceInfoActivity";
     @BindView(R.id.frame_container)
     FrameLayout frameContainer;
     @BindView(R.id.radioBtn_slot)
@@ -684,14 +689,41 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
         showSyncingProgressDialog();
         MokoSupport.getInstance().sendOrder(OrderTaskAssembler.resetDevice());
     }
-
     public void chooseFirmwareFile() {
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("*/*");//设置类型，我这里是任意类型，任意后缀的可以这样写。
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
+
         try {
-            startActivityForResult(Intent.createChooser(intent, "select file first!"), REQUEST_CODE_SELECT_FIRMWARE);
-        } catch (ActivityNotFoundException ex) {
+            //
+            BeaconDatabaseHelper databaseHelper = new BeaconDatabaseHelper(getApplicationContext());
+            BeaconInformationModel beacon = databaseHelper.GetByMacAdrress(this.mDeviceMac.toString().toUpperCase().replaceAll(":", ""));
+            if (beacon == null || TextUtils.isEmpty(beacon.getFirmwareUrl())) {
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.setType("*/*");//设置类型，我这里是任意类型，任意后缀的可以这样写。
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                startActivityForResult(Intent.createChooser(intent, "select file first!"), REQUEST_CODE_SELECT_FIRMWARE);
+                return;
+            }else{
+                String firmwareFilePath = beacon.getFirmwareUrl().split("/")[beacon.getFirmwareUrl().split("/").length-1 ];
+
+                byte[] fileBytes = FileUtils.readFileToBytes(getApplicationContext(), firmwareFilePath);
+                if (fileBytes!=null) {
+                    mFirmwareFileBytes = fileBytes;
+                     showDFUProgressDialog("Waiting...");
+                     otaBegin();
+                    isUpgrading = true;
+                }
+                showDFUProgressDialog("Waiting...");
+                FileDownloader fileDownloader = new FileDownloader(this);
+                mFirmwareFileBytes = fileDownloader.execute(beacon.getFirmwareUrl()).get();
+                if(mFirmwareFileBytes!=null){
+                    isUpgrading = true;
+                    otaBegin();
+                }else{
+                    dismissDFUProgressDialog();
+                    ToastUtils.showToast(this, "Error could not download file");
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
             ToastUtils.showToast(this, "install file manager app");
         }
     }
@@ -779,10 +811,24 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
             mDFUDialog.dismiss();
         }
         AlertMessageDialog dialog = new AlertMessageDialog();
+        JsonObject jsonMessage = new JsonObject();
+        String mac = !TextUtils.isEmpty(mDeviceMac) ?mDeviceMac : "";
+        jsonMessage.addProperty("MacAddress",  mac);
         if (isUpgradeCompleted) {
+            jsonMessage.addProperty("Success",  true);
+            jsonMessage.addProperty("Message",  "DFU Successfully");
             dialog.setMessage("DFU Successfully!\nPlease reconnect the device.");
         } else {
+            jsonMessage.addProperty("Success",  false);
+            jsonMessage.addProperty("Message",  "DFU Failed");
             dialog.setMessage("Opps!DFU Failed.\nPlease try again!");
+        }
+        DfuMqttClient dfuMqttClient = new DfuMqttClient(getApplicationContext(),jsonMessage,mac);
+        try {
+            dfuMqttClient.execute();
+        } catch (Exception e) {
+            Log.e(TAG,e.toString());
+            e.printStackTrace();
         }
         dialog.setCancelGone();
         dialog.setConfirm(R.string.ok);

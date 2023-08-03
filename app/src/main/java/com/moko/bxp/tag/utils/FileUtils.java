@@ -28,6 +28,22 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 public class FileUtils {
+
+    public static byte[] readFileToBytes(Context context, String fileName) {
+        byte[] bytes = null;
+
+        try {
+            FileInputStream fileInputStream = context.openFileInput(fileName);
+            int fileSize = fileInputStream.available();
+            bytes = new byte[fileSize];
+            fileInputStream.read(bytes);
+            fileInputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return bytes;
+    }
     /**
      * 专为Android4.4设计的从Uri获取文件绝对路径，以前的方法已不好使
      */

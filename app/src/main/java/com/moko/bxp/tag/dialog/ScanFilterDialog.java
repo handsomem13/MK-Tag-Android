@@ -3,6 +3,7 @@ package com.moko.bxp.tag.dialog;
 import android.content.Context;
 import android.text.TextUtils;
 import android.view.View;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -10,6 +11,7 @@ import android.widget.TextView;
 import com.moko.bxp.tag.R;
 
 import butterknife.BindView;
+import butterknife.OnCheckedChanged;
 import butterknife.OnClick;
 
 
@@ -22,11 +24,12 @@ public class ScanFilterDialog extends BaseDialog {
     TextView tvRssi;
     @BindView(R.id.sb_rssi)
     SeekBar sbRssi;
+    @BindView(R.id.cb_PendingUpdates)  CheckBox cbPendingUpdates;
 
     private int filterRssi;
     private String filterName;
     private String filterMac;
-
+    private boolean pendingUpdates;
     public ScanFilterDialog(Context context) {
         super(context);
     }
@@ -66,6 +69,7 @@ public class ScanFilterDialog extends BaseDialog {
             etFilterMac.setText(filterMac);
             etFilterMac.setSelection(filterMac.length());
         }
+        cbPendingUpdates.setChecked(pendingUpdates);
         setDismissEnable(true);
     }
 
@@ -81,29 +85,18 @@ public class ScanFilterDialog extends BaseDialog {
 
     @OnClick(R.id.tv_done)
     public void onViewClicked(View view) {
-        listener.onDone(etFilterName.getText().toString(), etFilterMac.getText().toString(), filterRssi);
+        listener.onDone(etFilterName.getText().toString(), etFilterMac.getText().toString(), filterRssi,cbPendingUpdates.isChecked());
         dismiss();
     }
 
     private OnScanFilterListener listener;
 
-    public void setOnScanFilterListener(OnScanFilterListener listener) {
-        this.listener = listener;
-    }
-
-    public void setFilterName(String filterName) {
-        this.filterName = filterName;
-    }
-
-    public void setFilterMac(String filterMac) {
-        this.filterMac = filterMac;
-    }
-
-    public void setFilterRssi(int filterRssi) {
-        this.filterRssi = filterRssi;
-    }
-
+    public void setOnScanFilterListener(OnScanFilterListener listener) { this.listener = listener; }
+    public void setFilterName(String filterName) { this.filterName = filterName; }
+    public void setFilterMac(String filterMac) { this.filterMac = filterMac; }
+    public void setFilterRssi(int filterRssi) { this.filterRssi = filterRssi; }
+    public void setPendingUpdates(boolean pendingUpdates) { this.pendingUpdates = pendingUpdates;  }
     public interface OnScanFilterListener {
-        void onDone(String filterName, String filterMac, int filterRssi);
+        void onDone(String filterName, String filterMac, int filterRssi,boolean pendingUpdates);
     }
 }

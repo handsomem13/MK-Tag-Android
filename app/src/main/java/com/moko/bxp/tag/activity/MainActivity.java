@@ -6,10 +6,12 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
@@ -24,6 +26,14 @@ import com.moko.ble.lib.event.ConnectStatusEvent;
 import com.moko.ble.lib.event.OrderTaskResponseEvent;
 import com.moko.ble.lib.task.OrderTask;
 import com.moko.ble.lib.task.OrderTaskResponse;
+import com.moko.bxp.sethala.clients.Configuration;
+import com.moko.bxp.sethala.clients.DeviceInformationClient;
+import com.moko.bxp.sethala.database.BeaconInformationModel;
+import com.moko.bxp.sethala.database.SqliteHelper;
+import com.moko.bxp.sethala.helpers.Tag;
+import com.moko.bxp.sethala.interfaces.DeviceInformationService;
+import com.moko.bxp.sethala.models.DeviceModel;
+import com.moko.bxp.sethala.sqlite.BeaconDatabaseHelper;
 import com.moko.bxp.tag.AppConstants;
 import com.moko.bxp.tag.R;
 import com.moko.bxp.tag.adapter.DeviceListAdapter;
@@ -52,8 +62,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+import androidx.annotation.RequiresApi;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -61,7 +73,9 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
-
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class MainActivity extends BaseActivity implements MokoScanDeviceCallback, BaseQuickAdapter.OnItemChildClickListener {
 
@@ -77,6 +91,8 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
     RelativeLayout rl_filter;
     @BindView(R.id.tv_filter)
     TextView tv_filter;
+    @BindView(R.id.tv_ErrorMessage)
+    TextView tv_ErrorMessage;
     private boolean mReceiverTag = false;
     private ConcurrentHashMap<String, AdvInfo> advInfoHashMap;
     private ArrayList<AdvInfo> advInfoList;
@@ -85,13 +101,15 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
     private Handler mHandler;
     private boolean isPasswordError;
     private boolean isVerifyPassword;
-
+    private List<BeaconInformationModel> pendingInstallations  =  new ArrayList<>();
+    private BeaconDatabaseHelper databaseHelper ;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
         MokoSupport.getInstance().init(getApplicationContext());
+        databaseHelper = new BeaconDatabaseHelper(getApplicationContext());
         advInfoHashMap = new ConcurrentHashMap<>();
         advInfoList = new ArrayList<>();
         adapter = new DeviceListAdapter();
@@ -121,8 +139,61 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                 startScan();
             }
         }
+        setUpDatabase();
     }
 
+    @Override
+    protected void onStart() {
+        this.syncDevices();
+        super.onStart();
+    }
+    private  void setUpDatabase(){
+        try {
+            SqliteHelper sqlDatabase = new SqliteHelper(this);
+            sqlDatabase.getWritableDatabase();
+            sqlDatabase.close();
+        }catch (Exception ex){
+
+        }
+    }
+    private void  syncDevices(){
+        try {
+            DeviceInformationService deviceInformationService = DeviceInformationClient.getApiService();
+            Call<DeviceModel> call = deviceInformationService.getDevices(Configuration.Authorization);
+            if(pendingUpdates){
+                mokoBleScanner.stopScanDevice();
+            }
+            call.enqueue(new Callback<DeviceModel>() {
+                @Override
+                public void onResponse(Call<DeviceModel> call, Response<DeviceModel> response) {
+                    if (response.isSuccessful()) {
+                        DeviceModel model = response.body();
+                        // Now you can use the Person object, which contains the parsed JSON data.
+                        Log.d("MyActivity", "DeviceInformationService API CALL: "+ model.Message +" :: " + model.Success);
+                        databaseHelper.deleteAllRecords();
+                        pendingInstallations = model.Data;
+                        if(model.Data.size()>0){
+                            databaseHelper.insertMany(model.Data);
+                            if(pendingUpdates){
+                                startScan();
+                            }
+                        }
+                    } else {
+                        // Handle error
+                        Log.e("MyActivity", "DeviceInformationService API CALL: Error :: " + response.message());
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<DeviceModel> call, Throwable t) {
+                    // Handle failure
+                    Log.e("MyActivity", "Error: " + t.getMessage());
+                }
+            });
+        }catch (Exception ex){
+            Log.e(Tag.AuthClient,ex.toString() );
+        }
+    }
     private String unLockResponse;
     private BroadcastReceiver mReceiver = new BroadcastReceiver() {
 
@@ -162,7 +233,9 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
             dismissLoadingMessageDialog();
             if (isVerifyPassword) {
                 isVerifyPassword = false;
-                showPasswordDialog();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    showPasswordDialog();
+                }
                 return;
             }
             if (animation == null) {
@@ -296,6 +369,7 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
     public void onStartScan() {
         advInfoHashMap.clear();
         new Thread(new Runnable() {
+            @RequiresApi(api = Build.VERSION_CODES.N)
             @Override
             public void run() {
                 while (animation != null) {
@@ -332,6 +406,7 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
         animation = null;
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.N)
     private void updateDevices() {
         advInfoList.clear();
         if (!TextUtils.isEmpty(filterName)
@@ -339,12 +414,30 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                 || filterRssi != -100) {
             ArrayList<AdvInfo> advInfoListFilter = new ArrayList<>(advInfoHashMap.values());
             Iterator<AdvInfo> iterator = advInfoListFilter.iterator();
+            pendingInstallations = databaseHelper.GetAll();
             while (iterator.hasNext()) {
                 AdvInfo advInfo = iterator.next();
                 if (advInfo.rssi > filterRssi) {
                     if (TextUtils.isEmpty(filterName) && TextUtils.isEmpty(filterMac)) {
+                        Log.i("Scan Filter", "Scanning for any device");
                         continue;
-                    } else {
+                    }
+                    else if(pendingUpdates){
+                        Log.i("Scan Filter", "Scanning for pending updates only");
+                        if (TextUtils.isEmpty(advInfo.mac)) {
+                            iterator.remove();
+                            continue;
+                        }
+                        BeaconInformationModel beacon = pendingInstallations.stream()
+                                .filter(_beacon -> advInfo.mac.toLowerCase().replaceAll(":", "").equals(_beacon.getMacAddress().toLowerCase().replaceAll(":", "")))
+                                .findAny()
+                                .orElse(null);
+                        if(beacon==null){
+                            iterator.remove();
+                            continue;
+                        }
+                    }
+                    else {
                         if (!TextUtils.isEmpty(filterMac) && TextUtils.isEmpty(advInfo.mac)) {
                             iterator.remove();
                         } else if (!TextUtils.isEmpty(filterMac) && advInfo.mac.toLowerCase().replaceAll(":", "").contains(filterMac.toLowerCase())) {
@@ -383,16 +476,33 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
     public String filterName;
     public String filterMac;
     public int filterRssi = -100;
+    public  boolean pendingUpdates = false;
 
     private void startScan() {
+        tv_ErrorMessage.setText("");
         if (!MokoSupport.getInstance().isBluetoothOpen()) {
             // 蓝牙未打开，开启蓝牙
             MokoSupport.getInstance().enableBluetooth();
+            tv_ErrorMessage.setText("Bluetooth is not enabled");
             return;
         }
         animation = AnimationUtils.loadAnimation(this, R.anim.rotate_refresh);
         findViewById(R.id.iv_refresh).startAnimation(animation);
         advInfoAnalysisImpl = new AdvInfoAnalysisImpl();
+        if(pendingUpdates ){
+            pendingInstallations = databaseHelper.GetAll();
+            ArrayList<String> beacons =    new ArrayList<>();
+            for (BeaconInformationModel beacon: pendingInstallations                 ) {
+                beacons.add(beacon.getMacAddress());
+            }
+            if(beacons.size()==0){
+                tv_ErrorMessage.setText("Checking for update. No pending updates found");
+                return;
+            }
+            mokoBleScanner.setBeaconList(beacons);
+        }else{
+            mokoBleScanner.setBeaconList(null);
+        }
         mokoBleScanner.startScanDevice(this);
     }
 
@@ -452,30 +562,40 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
         }
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.N)
     private void showPasswordDialog() {
         // show password
-        final PasswordDialog dialog = new PasswordDialog();
-        dialog.setPassword(mSavedPassword);
-        dialog.setOnPasswordClicked(new PasswordDialog.PasswordClickListener() {
-            @Override
-            public void onEnsureClicked(String password) {
-                if (!MokoSupport.getInstance().isBluetoothOpen()) {
-                    MokoSupport.getInstance().enableBluetooth();
-                    return;
+        BeaconInformationModel beacon = pendingInstallations.stream()
+                .filter(_beacon -> mSelectedDeviceMac.toLowerCase().replaceAll(":", "").equals(_beacon.getMacAddress().toLowerCase().replaceAll(":", "")))
+                .findAny()
+                .orElse(null);
+        if(beacon!=null && !TextUtils.isEmpty(beacon.getPassword())){
+            mPassword = beacon.getPassword();
+            ivRefresh.postDelayed(() -> MokoSupport.getInstance().connDevice(mSelectedDeviceMac), 500);
+        } else{
+            final PasswordDialog dialog = new PasswordDialog();
+            dialog.setPassword(mSavedPassword);
+            dialog.setOnPasswordClicked(new PasswordDialog.PasswordClickListener() {
+                @Override
+                public void onEnsureClicked(String password) {
+                    if (!MokoSupport.getInstance().isBluetoothOpen()) {
+                        MokoSupport.getInstance().enableBluetooth();
+                        return;
+                    }
+                    XLog.i(password);
+                    mPassword = password;
+                    showLoadingProgressDialog();
+                    ivRefresh.postDelayed(() -> MokoSupport.getInstance().connDevice(mSelectedDeviceMac), 500);
                 }
-                XLog.i(password);
-                mPassword = password;
-                showLoadingProgressDialog();
-                ivRefresh.postDelayed(() -> MokoSupport.getInstance().connDevice(mSelectedDeviceMac), 500);
-            }
 
-            @Override
-            public void onDismiss() {
-                if (animation == null)
-                    startScan();
-            }
-        });
-        dialog.show(getSupportFragmentManager());
+                @Override
+                public void onDismiss() {
+                    if (animation == null)
+                        startScan();
+                }
+            });
+            dialog.show(getSupportFragmentManager());
+        }
     }
 
     public void onBack(View view) {
@@ -501,7 +621,8 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
         scanFilterDialog.setFilterName(filterName);
         scanFilterDialog.setFilterMac(filterMac);
         scanFilterDialog.setFilterRssi(filterRssi);
-        scanFilterDialog.setOnScanFilterListener((filterName, filterMac, filterRssi) -> {
+        scanFilterDialog.setPendingUpdates(pendingUpdates);
+        scanFilterDialog.setOnScanFilterListener((filterName, filterMac, filterRssi,pendingUpdates) -> {
             MainActivity.this.filterName = filterName;
             MainActivity.this.filterMac = filterMac;
             String showFilterMac = "";
@@ -516,6 +637,7 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
             } else {
                 showFilterMac = filterMac;
             }
+            MainActivity.this.pendingUpdates = pendingUpdates;
             MainActivity.this.filterRssi = filterRssi;
             if (!TextUtils.isEmpty(filterName)
                     || !TextUtils.isEmpty(showFilterMac)

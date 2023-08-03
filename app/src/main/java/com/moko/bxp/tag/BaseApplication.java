@@ -15,6 +15,7 @@ import com.elvishew.xlog.printer.Printer;
 import com.elvishew.xlog.printer.file.FilePrinter;
 import com.elvishew.xlog.printer.file.naming.ChangelessFileNameGenerator;
 import com.moko.ble.lib.log.ClearLogBackStrategy;
+import com.moko.bxp.sethala.database.SqliteHelper;
 import com.moko.bxp.tag.utils.IOUtils;
 
 import java.io.File;
