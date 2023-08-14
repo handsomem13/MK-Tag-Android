@@ -4,15 +4,25 @@ import android.app.Activity;
 import android.app.Fragment;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import com.moko.ble.lib.task.OrderTask;
 import com.moko.ble.lib.utils.MokoUtils;
+import com.moko.bxp.sethala.clients.Configuration;
+import com.moko.bxp.sethala.clients.DeviceInformationClient;
+import com.moko.bxp.sethala.database.BeaconInformationModel;
+import com.moko.bxp.sethala.helpers.Tag;
+import com.moko.bxp.sethala.interfaces.DeviceInformationService;
+import com.moko.bxp.sethala.models.BeaconSettingsApiModel;
+import com.moko.bxp.sethala.models.DeviceModel;
+import com.moko.bxp.sethala.sqlite.BeaconDatabaseHelper;
 import com.moko.bxp.tag.AppConstants;
 import com.moko.bxp.tag.R;
 import com.moko.bxp.tag.activity.DeviceInfoActivity;
@@ -30,6 +40,9 @@ import java.util.Arrays;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class SlotFragment extends Fragment {
 
@@ -58,7 +71,8 @@ public class SlotFragment extends Fragment {
     TextView tvSlot6;
     @BindView(R.id.rl_slot6)
     RelativeLayout rlSlot6;
-
+    @BindView(R.id.bt_updateFirmware)
+    Button btnUdateFirmware;
     private DeviceInfoActivity activity;
     private SlotData slotData;
     private boolean hallPowerEnable;
@@ -94,6 +108,16 @@ public class SlotFragment extends Fragment {
     @Override
     public void onResume() {
         Log.i(TAG, "onResume: ");
+        try {
+            if (activity.updateFirmware ) {
+                btnUdateFirmware.setVisibility(View.VISIBLE);
+            }else{
+                btnUdateFirmware.setVisibility(View.GONE);
+            }
+        }catch (Exception ex){
+            //   btnUdateFirmware.setVisibility(View.GONE);
+            Log.e(TAG,ex.toString());
+        }
         super.onResume();
     }
 

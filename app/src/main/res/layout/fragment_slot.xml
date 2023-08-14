@@ -186,4 +186,12 @@
             android:layout_alignParentBottom="true" />
     </RelativeLayout>
 
+    <Button
+        android:id="@+id/bt_updateFirmware"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/shape_radius_blue_btn_bg"
+        android:onClick="onDFU"
+        android:text="Update Firmware" />
+
 </LinearLayout>

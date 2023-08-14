@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.graphics.Paint;
 import android.net.Uri;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -12,6 +13,8 @@ import android.widget.TextView;
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.BaseViewHolder;
 import com.elvishew.xlog.XLog;
+import com.moko.bxp.sethala.database.BeaconInformationModel;
+import com.moko.bxp.sethala.sqlite.BeaconDatabaseHelper;
 import com.moko.bxp.tag.R;
 import com.moko.bxp.tag.entity.AdvIBeacon;
 import com.moko.bxp.tag.entity.AdvInfo;
@@ -24,6 +27,7 @@ import com.moko.bxp.tag.utils.AdvInfoParser;
 import java.util.ArrayList;
 
 public class DeviceListAdapter extends BaseQuickAdapter<AdvInfo, BaseViewHolder> {
+    private  final String TAG = "DeviceListAdapter";
     public DeviceListAdapter() {
         super(R.layout.list_item_device);
     }

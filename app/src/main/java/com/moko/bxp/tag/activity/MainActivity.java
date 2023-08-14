@@ -103,6 +103,8 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
     private boolean isVerifyPassword;
     private List<BeaconInformationModel> pendingInstallations  =  new ArrayList<>();
     private BeaconDatabaseHelper databaseHelper ;
+    private boolean updateFirmware;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -306,6 +308,7 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                                     } else {
                                         Intent i = new Intent(this, DeviceInfoActivity.class);
                                         i.putExtra(AppConstants.EXTRA_KEY_PASSWORD_VERIFICATION, false);
+                                        i.putExtra(AppConstants.EXTRA_KEY_UPDATE_FIRMWARE , updateFirmware);
                                         startActivityForResult(i, AppConstants.REQUEST_CODE_DEVICE_INFO);
                                     }
                                     break;
@@ -322,6 +325,7 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                                         XLog.i("Success");
                                         Intent i = new Intent(this, DeviceInfoActivity.class);
                                         i.putExtra(AppConstants.EXTRA_KEY_PASSWORD_VERIFICATION, true);
+                                        i.putExtra(AppConstants.EXTRA_KEY_UPDATE_FIRMWARE , updateFirmware);
                                         startActivityForResult(i, AppConstants.REQUEST_CODE_DEVICE_INFO);
                                     } else {
                                         isPasswordError = true;
@@ -550,13 +554,20 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
             MokoSupport.getInstance().enableBluetooth();
             return;
         }
-        final AdvInfo advInfo = (AdvInfo) adapter.getItem(position);
+        final AdvInfo advInfo = (AdvInfo) adapter.getItem(position);       
         if (advInfo != null && !isFinishing()) {
             if (animation != null) {
                 mHandler.removeMessages(0);
                 mokoBleScanner.stopScanDevice();
             }
             mSelectedDeviceMac = advInfo.mac;
+            BeaconDatabaseHelper databaseHelper = new BeaconDatabaseHelper(this.getApplicationContext());
+            BeaconInformationModel beacon = databaseHelper.GetByMacAdrress(mSelectedDeviceMac.toUpperCase().replaceAll(":", ""));
+            if (beacon != null && !TextUtils.isEmpty(beacon.getIsUpToDate()) && beacon.getIsUpToDate()!="true" ) {
+                updateFirmware = true;
+            }else{
+                updateFirmware = false;
+            }
             showLoadingProgressDialog();
             ivRefresh.postDelayed(() -> MokoSupport.getInstance().connDevice(advInfo.mac), 500);
         }

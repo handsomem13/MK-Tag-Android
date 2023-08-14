@@ -30,8 +30,15 @@ import com.moko.ble.lib.event.OrderTaskResponseEvent;
 import com.moko.ble.lib.task.OrderTask;
 import com.moko.ble.lib.task.OrderTaskResponse;
 import com.moko.ble.lib.utils.MokoUtils;
+import com.moko.bxp.sethala.clients.Configuration;
+import com.moko.bxp.sethala.clients.DeviceInformationClient;
 import com.moko.bxp.sethala.clients.DfuMqttClient;
 import com.moko.bxp.sethala.database.BeaconInformationModel;
+import com.moko.bxp.sethala.interfaces.DeviceInformationService;
+import com.moko.bxp.sethala.models.AccelerometerSettings;
+import com.moko.bxp.sethala.models.BeaconSettingsApiModel;
+import com.moko.bxp.sethala.models.FirmwareSettings;
+import com.moko.bxp.sethala.models.SlotSettings;
 import com.moko.bxp.sethala.sqlite.BeaconDatabaseHelper;
 import com.moko.bxp.tag.AppConstants;
 import com.moko.bxp.tag.R;
@@ -39,6 +46,9 @@ import com.moko.bxp.tag.dialog.AlertMessageDialog;
 import com.moko.bxp.tag.dialog.BottomDialog;
 import com.moko.bxp.tag.dialog.LoadingMessageDialog;
 import com.moko.bxp.tag.dialog.ModifyPasswordDialog;
+import com.moko.bxp.tag.entity.SlotData;
+import com.moko.bxp.tag.entity.SlotEnum;
+import com.moko.bxp.tag.entity.SlotFrameTypeEnum;
 import com.moko.bxp.tag.fragment.DeviceFragment;
 import com.moko.bxp.tag.fragment.SettingFragment;
 import com.moko.bxp.tag.fragment.SlotFragment;
@@ -61,10 +71,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.concurrent.ExecutionException;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnCheckedChangeListener {
     public static final int REQUEST_CODE_SELECT_FIRMWARE = 0x10;
@@ -96,6 +108,11 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
     private boolean isHallPowerEnable;
     private ArrayList<String> mAdvModeList;
     private int mAdvModeSelected;
+    private FirmwareSettings firmwareSettings;
+    private AccelerometerSettings accelerometerSettings;
+    private ArrayList<SlotSettings> slotSettings;
+    private  String settingStatus;
+    public boolean updateFirmware;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,6 +121,7 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
         ButterKnife.bind(this);
         fragmentManager = getFragmentManager();
         isVerifyPassword = getIntent().getBooleanExtra(AppConstants.EXTRA_KEY_PASSWORD_VERIFICATION, false);
+        updateFirmware =  getIntent().getBooleanExtra(AppConstants.EXTRA_KEY_UPDATE_FIRMWARE, false);
         enablePasswordVerify = isVerifyPassword;
         initFragment();
         rgOptions.setOnCheckedChangeListener(this);
@@ -174,7 +192,45 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
         });
 
     }
+    void getSlotSettings(){
+        try {
+            DeviceInformationService deviceInformationService = DeviceInformationClient.getApiService();
+            Call<BeaconSettingsApiModel> call = deviceInformationService.getConfigurations(mDeviceMac.toUpperCase().replaceAll(":", ""), Configuration.Authorization);
+            call.enqueue(new Callback<BeaconSettingsApiModel>() {
 
+                @Override
+                public void onResponse(Call<BeaconSettingsApiModel> call, Response<BeaconSettingsApiModel> response) {
+                    if (response.isSuccessful()) {
+                        BeaconSettingsApiModel model = response.body();
+                        // Now you can use the Person object, which contains the parsed JSON data.
+                        Log.d("MyActivity", "DeviceInformationService API CALL: "+ model.Message +" :: " + model.Success);
+                        if(model.Data!=null){
+                            if(model.Data.getFirmware()!=null){
+                                firmwareSettings = model.Data.getFirmware();
+                            }
+                            if(model.Data.getAccelerometer()!=null){
+                                accelerometerSettings = model.Data.getAccelerometer();
+                            }
+                            if(model.Data.getSlots()!=null){
+                                slotSettings = model.Data.getSlots();
+                            }
+                            settingStatus = model.Data.getStatus();
+                        }
+                    } else {
+                        // Handle error
+                        Log.e(TAG, "DeviceInformationService API CALL: Error :: " + response.message());
+                    }
+                }
+                @Override
+                public void onFailure(Call<BeaconSettingsApiModel> call, Throwable t) {
+                    // Handle failure
+                    Log.e(TAG, "Error: " + t.getMessage());
+                }
+            });
+        }catch (Exception ex){
+            Log.e(TAG,ex.toString() );
+        }
+    }
 
     @Subscribe(threadMode = ThreadMode.POSTING, priority = 100)
     public void onOrderTaskResponseEvent(OrderTaskResponseEvent event) {
@@ -367,6 +423,7 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
                                             stringBuffer.insert(14, ":");
                                             mDeviceMac = stringBuffer.toString().toUpperCase();
                                             deviceFragment.setMac(mDeviceMac);
+                                            getSlotSettings();
                                         }
                                         break;
                                     case KEY_SENSOR_TYPE:
@@ -689,6 +746,91 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
         showSyncingProgressDialog();
         MokoSupport.getInstance().sendOrder(OrderTaskAssembler.resetDevice());
     }
+    public void updateSettings() {
+        showSyncingProgressDialog();
+        if(slotSettings!=null && slotSettings.size()>0){
+            for (SlotSettings setting: slotSettings) {
+                SlotData slot = new SlotData();
+                try {
+                    // BaseParam
+                    slot.rssi_0m = setting.getData().getRanging();
+                    slot.txPower = setting.getData().getTxPower();
+                    slot.advInterval = setting.getData().getInterval();
+                    slot.advDuration = setting.getData().getDuration();
+                    slot.standbyDuration = setting.getData().getStandby();
+
+                    // Trigger
+                    if(setting.getData().getIsStartAdvertising())
+                        slot.triggerType=5;
+                    if(setting.getData().getIsStopAdvertising())
+                        slot.triggerType=6;
+                    slot.triggerAdvStatus = setting.getData().getIsStopAdvertising() ? 1: 0;
+                    slot.triggerAdvDuration =  setting.getData().getAdvDuration();
+                    slot.staticDuration = slot.triggerType==6 ? 60 : setting.getData().getStaticDuration();
+                    switch(setting.getText().toUpperCase().trim()){
+                        case "SLOT1":
+                            slot.slotEnum = SlotEnum.SLOT1;
+                            break;
+                        case "SLOT2":
+                            slot.slotEnum = SlotEnum.SLOT2;
+                            break;
+                        case "SLOT3":
+                            slot.slotEnum = SlotEnum.SLOT3;
+                            break;
+                        case "SLOT4":
+                            slot.slotEnum = SlotEnum.SLOT4;
+                            break;
+                        case "SLOT5":
+                            slot.slotEnum = SlotEnum.SLOT5;
+                            break;
+                        case "SLOT6":
+                            slot.slotEnum = SlotEnum.SLOT6;
+                            break;
+                        default:
+                            break;
+                    }
+                    switch(setting.getData().getSelectedFrame().toUpperCase().trim()){
+                        case "TLM":
+                            slot.frameTypeEnum = SlotFrameTypeEnum.TLM;
+                            break;
+                        case "Tag Info":
+                            slot.frameTypeEnum = SlotFrameTypeEnum.TAG;
+                            slot.deviceName = setting.getData().getDeviceName();
+                            slot.tagId= setting.getData().getTagId();
+                            break;
+                        case "UID":
+                            slot.frameTypeEnum = SlotFrameTypeEnum.UID;
+                            slot. namespace= setting.getData().getNamespace();
+                            slot. instanceId= setting.getData().getInstance();
+                            break;
+//                    case "Url":
+//                        slot.frameTypeEnum = SlotFrameTypeEnum.URL;
+//                        slot.urlSchemeEnum= setting.getData()
+//                        slot.urlContentHex= setting.getData()
+//                        break;
+                        case "iBeacon":
+                            slot.frameTypeEnum = SlotFrameTypeEnum.IBEACON;
+                            slot.iBeaconUUID= setting.getData().getiBeaconUUID();
+                            slot.major= setting.getData().getMajor();
+                            slot.minor= setting.getData().getMinor();
+                            slot.rssi_1m= setting.getData().getRssi1m();
+                            break;
+                        case "No Data":
+                            slot.frameTypeEnum = SlotFrameTypeEnum.NO_DATA;
+                            break;
+                        default:
+                            break;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    ToastUtils.showToast(this, "install file manager app");
+                }
+                Log.i(TAG,slot.toString());
+            }
+        }
+//        showSyncingProgressDialog();
+//        MokoSupport.getInstance().sendOrder(OrderTaskAssembler.resetDevice());
+    }
     public void chooseFirmwareFile() {
 
         try {
@@ -759,7 +901,15 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
         resetDeviceDialog.setOnAlertConfirmListener(this::resetDevice);
         resetDeviceDialog.show(getSupportFragmentManager());
     }
-
+    public void onUpdateBeaconSettings(View view) {
+        if (isWindowLocked()) return;
+        AlertMessageDialog resetDeviceDialog = new AlertMessageDialog();
+        resetDeviceDialog.setTitle("Warning！");
+        resetDeviceDialog.setMessage("Are you sure to update the Beacon？");
+        resetDeviceDialog.setConfirm(R.string.ok);
+        resetDeviceDialog.setOnAlertConfirmListener(this::updateSettings);
+        resetDeviceDialog.show(getSupportFragmentManager());
+    }
     public void onRemoteMinder(View view) {
         Intent intent = new Intent(this, RemoteReminderActivity.class);
         startActivity(intent);
