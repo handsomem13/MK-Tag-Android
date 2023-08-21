@@ -50,6 +50,7 @@ public class BeaconDatabaseHelper implements  ISqlite{
                 _model.setMacAddress(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_MACADDRESS)));
                 _model.setRssi(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_RSSI)));
                 _model.setThingId(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_THINGID)));
+                _model.setThingName(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_THINGNAME)));
                 _model.setSoftwareVersion(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_SOFTWAREVERSION)));
                 _model.setDateTimeStamp(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_DATETIMESTAMP)));
                 _model.setLastUpdatedDateTimeStamp(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_LASTUPDATEDTIMESTAMP)));
@@ -74,6 +75,7 @@ public class BeaconDatabaseHelper implements  ISqlite{
                 _model.setMacAddress(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_MACADDRESS)));
                 _model.setRssi(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_RSSI)));
                 _model.setThingId(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_THINGID)));
+                _model.setThingName(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_THINGNAME)));
                 _model.setSoftwareVersion(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_SOFTWAREVERSION)));
                 _model.setDateTimeStamp(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_DATETIMESTAMP)));
                 _model.setLastUpdatedDateTimeStamp(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_LASTUPDATEDTIMESTAMP)));
@@ -107,6 +109,7 @@ public class BeaconDatabaseHelper implements  ISqlite{
                    _model.setIsUpToDate(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_ISUPTODATE)));
                    _model.setPassword(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_PASSWORD)));
                    _model.setFirmwareUrl(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_FIRMWAREURL)));
+                   _model.setThingName(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_THINGNAME)));
                    data.add(_model);
                } while (cursor.moveToNext());
            }
@@ -135,6 +138,7 @@ public class BeaconDatabaseHelper implements  ISqlite{
             values.put(SqliteHelper.BEACONINFO_COLUMN_ISUPTODATE,_model.getIsUpToDate());
             values.put(SqliteHelper.BEACONINFO_COLUMN_PASSWORD,_model.getPassword());
             values.put(SqliteHelper.BEACONINFO_COLUMN_FIRMWAREURL,_model.getFirmwareUrl());
+            values.put(SqliteHelper.BEACONINFO_COLUMN_THINGNAME,_model.getThingName());
             long rowId = database.insert(SqliteHelper.TABLE_BEACONINFORMATION, null, values);
             CloseDatabaseConnection();
             Log.i("Add", rowId+" Created successfully");
@@ -162,7 +166,12 @@ public class BeaconDatabaseHelper implements  ISqlite{
 
     @Override
     public <T> void Delete(String model) {
-
+        try {
+            int result = database.delete(SqliteHelper.TABLE_BEACONINFORMATION, SqliteHelper.BEACONINFO_COLUMN_MACADDRESS, new String[]{});
+        } catch (Exception e) {
+            // Handle the exception
+            Log.e("BeaconInformation",e.toString());
+        }
     }
     public void deleteAllRecords() {
         try {

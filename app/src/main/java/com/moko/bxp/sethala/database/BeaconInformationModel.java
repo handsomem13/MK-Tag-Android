@@ -5,6 +5,7 @@ import java.util.Date;
 public class BeaconInformationModel {
     private String AssetId;
     private String AssetName;
+    private String ThingName;
     private String MacAddress;
     private String Rssi;
     private String ThingId;
@@ -109,5 +110,13 @@ public class BeaconInformationModel {
 
     public void setFirmwareUrl(String firmwareUrl) {
         FirmwareUrl = firmwareUrl;
+    }
+
+    public String getThingName() {
+        return ThingName;
+    }
+
+    public void setThingName(String thingName) {
+        ThingName = thingName;
     }
 }

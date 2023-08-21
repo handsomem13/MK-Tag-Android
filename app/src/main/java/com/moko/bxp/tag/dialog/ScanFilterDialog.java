@@ -25,11 +25,12 @@ public class ScanFilterDialog extends BaseDialog {
     @BindView(R.id.sb_rssi)
     SeekBar sbRssi;
     @BindView(R.id.cb_PendingUpdates)  CheckBox cbPendingUpdates;
-
+    @BindView(R.id.cb_autoConnect)  CheckBox cbAutoConnect;
     private int filterRssi;
     private String filterName;
     private String filterMac;
     private boolean pendingUpdates;
+    private boolean autConnect;
     public ScanFilterDialog(Context context) {
         super(context);
     }
@@ -70,6 +71,7 @@ public class ScanFilterDialog extends BaseDialog {
             etFilterMac.setSelection(filterMac.length());
         }
         cbPendingUpdates.setChecked(pendingUpdates);
+        cbAutoConnect.setChecked(autConnect);
         setDismissEnable(true);
     }
 
@@ -85,7 +87,7 @@ public class ScanFilterDialog extends BaseDialog {
 
     @OnClick(R.id.tv_done)
     public void onViewClicked(View view) {
-        listener.onDone(etFilterName.getText().toString(), etFilterMac.getText().toString(), filterRssi,cbPendingUpdates.isChecked());
+        listener.onDone(etFilterName.getText().toString(), etFilterMac.getText().toString(), filterRssi,cbPendingUpdates.isChecked(),cbAutoConnect.isChecked());
         dismiss();
     }
 
@@ -96,7 +98,9 @@ public class ScanFilterDialog extends BaseDialog {
     public void setFilterMac(String filterMac) { this.filterMac = filterMac; }
     public void setFilterRssi(int filterRssi) { this.filterRssi = filterRssi; }
     public void setPendingUpdates(boolean pendingUpdates) { this.pendingUpdates = pendingUpdates;  }
+    public void setAutConnect(boolean autConnect) { this.autConnect = autConnect; }
+
     public interface OnScanFilterListener {
-        void onDone(String filterName, String filterMac, int filterRssi,boolean pendingUpdates);
+        void onDone(String filterName, String filterMac, int filterRssi,boolean pendingUpdates,boolean cbAutoConnect);
     }
 }

@@ -192,6 +192,11 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
         });
 
     }
+    void checkPendingDfu(){
+        if(updateFirmware){
+           // chooseFirmwareFile();
+        }
+    }
     void getSlotSettings(){
         try {
             DeviceInformationService deviceInformationService = DeviceInformationClient.getApiService();
@@ -299,6 +304,7 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
             }
             if (MokoConstants.ACTION_ORDER_FINISH.equals(action)) {
                 dismissSyncProgressDialog();
+                checkPendingDfu();
             }
             if (MokoConstants.ACTION_ORDER_RESULT.equals(action)) {
                 OrderTaskResponse response = event.getResponse();

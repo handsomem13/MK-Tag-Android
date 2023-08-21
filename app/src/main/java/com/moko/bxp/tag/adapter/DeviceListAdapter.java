@@ -34,7 +34,21 @@ public class DeviceListAdapter extends BaseQuickAdapter<AdvInfo, BaseViewHolder>
 
     @Override
     protected void convert(BaseViewHolder helper, AdvInfo item) {
-        helper.setText(R.id.tv_name, TextUtils.isEmpty(item.name) ? "N/A" : item.name);
+        String boxName = "";
+        try {
+            BeaconDatabaseHelper databaseHelper = new BeaconDatabaseHelper(mContext);
+            if(item.mac!=null){
+                BeaconInformationModel beacon = databaseHelper.GetByMacAdrress(item.mac.toUpperCase().replaceAll(":", ""));
+                if(beacon!=null){
+                    boxName = beacon.getThingName();
+                }
+            }
+
+
+        }catch (Exception e){
+
+        }
+        helper.setText(R.id.tv_name,TextUtils.isEmpty(boxName) ? (TextUtils.isEmpty(item.name) ? "N/A"  : item.name) : boxName);
         helper.setText(R.id.tv_mac, "MAC:" + item.mac);
         helper.setText(R.id.tv_rssi, String.format("%ddBm", item.rssi));
         helper.setText(R.id.tv_interval_time, item.intervalTime == 0 ? "<->N/A" : String.format("<->%dms", item.intervalTime));

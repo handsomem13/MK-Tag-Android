@@ -16,7 +16,6 @@
         android:padding="15dp">
 
 
-
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -90,9 +89,9 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1.0"
                 android:background="@color/transparent"
+                android:digits="0123456789abcdefABCDEF"
                 android:gravity="center_vertical"
                 android:hint="1-6bytes HEX"
-                android:digits="0123456789abcdefABCDEF"
                 android:maxLength="12"
                 android:paddingLeft="10dp"
                 android:singleLine="true"
@@ -194,7 +193,7 @@
             android:id="@+id/tv_done"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="30dp"
+            android:layout_marginTop="10dp"
             android:background="@drawable/shape_radius_blue_btn_bg"
             android:gravity="center"
             android:paddingTop="10dp"
@@ -204,7 +203,8 @@
             android:textSize="20dp"
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tv_rssi_filter_tips" />
+            app:layout_constraintTop_toBottomOf="@id/cb_autoConnect" />
+
         <CheckBox
             android:id="@+id/cb_PendingUpdates"
             android:layout_width="match_parent"
@@ -213,6 +213,17 @@
             app:layout_constraintLeft_toLeftOf="parent"
             app:layout_constraintRight_toRightOf="parent"
             app:layout_constraintTop_toBottomOf="@id/tv_rssi_filter_tips"
+            tools:layout_editor_absoluteX="14dp"
+            tools:layout_editor_absoluteY="1dp" />
+
+        <CheckBox
+            android:id="@+id/cb_autoConnect"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Auto Connect"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/cb_PendingUpdates"
             tools:layout_editor_absoluteX="14dp"
             tools:layout_editor_absoluteY="1dp" />
 
