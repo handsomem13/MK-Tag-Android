@@ -153,11 +153,11 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
             }
         }
         setUpDatabase();
-        syncDevices();
     }
 
     @Override
     protected void onStart() {
+        this.syncDevices();
         super.onStart();
     }
     private  void setUpDatabase(){
@@ -314,6 +314,7 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                                         Intent i = new Intent(this, DeviceInfoActivity.class);
                                         i.putExtra(AppConstants.EXTRA_KEY_PASSWORD_VERIFICATION, false);
                                         i.putExtra(AppConstants.EXTRA_KEY_UPDATE_FIRMWARE , updateFirmware);
+                                        i.putExtra(AppConstants.EXTRA_KEY_AUTOCONNECT, cbAutoConnect&&updateFirmware);
                                         startActivityForResult(i, AppConstants.REQUEST_CODE_DEVICE_INFO);
                                     }
                                     break;
@@ -331,6 +332,7 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                                         Intent i = new Intent(this, DeviceInfoActivity.class);
                                         i.putExtra(AppConstants.EXTRA_KEY_PASSWORD_VERIFICATION, true);
                                         i.putExtra(AppConstants.EXTRA_KEY_UPDATE_FIRMWARE , updateFirmware);
+                                        i.putExtra(AppConstants.EXTRA_KEY_AUTOCONNECT, cbAutoConnect&&updateFirmware);
                                         try {
                                             JsonObject jsonMessage = new JsonObject();
                                             String mac = !TextUtils.isEmpty(mSelectedDeviceMac) ?mSelectedDeviceMac : "";

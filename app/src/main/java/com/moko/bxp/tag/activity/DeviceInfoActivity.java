@@ -81,6 +81,7 @@ import retrofit2.Response;
 public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnCheckedChangeListener {
     public static final int REQUEST_CODE_SELECT_FIRMWARE = 0x10;
     final String TAG = "DeviceInfoActivity";
+    BeaconDatabaseHelper databaseHelper ;
     @BindView(R.id.frame_container)
     FrameLayout frameContainer;
     @BindView(R.id.radioBtn_slot)
@@ -113,15 +114,18 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
     private ArrayList<SlotSettings> slotSettings;
     private  String settingStatus;
     public boolean updateFirmware;
+    private boolean autoConnect;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_device_info);
         ButterKnife.bind(this);
+         databaseHelper = new BeaconDatabaseHelper(this);
         fragmentManager = getFragmentManager();
         isVerifyPassword = getIntent().getBooleanExtra(AppConstants.EXTRA_KEY_PASSWORD_VERIFICATION, false);
         updateFirmware =  getIntent().getBooleanExtra(AppConstants.EXTRA_KEY_UPDATE_FIRMWARE, false);
+        autoConnect =  getIntent().getBooleanExtra(AppConstants.EXTRA_KEY_AUTOCONNECT, false);
         enablePasswordVerify = isVerifyPassword;
         initFragment();
         rgOptions.setOnCheckedChangeListener(this);
@@ -194,48 +198,48 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
     }
     void checkPendingDfu(){
         if(updateFirmware){
-           // chooseFirmwareFile();
+           chooseFirmwareFile();
         }
     }
-    void getSlotSettings(){
-        try {
-            DeviceInformationService deviceInformationService = DeviceInformationClient.getApiService();
-            Call<BeaconSettingsApiModel> call = deviceInformationService.getConfigurations(mDeviceMac.toUpperCase().replaceAll(":", ""), Configuration.Authorization);
-            call.enqueue(new Callback<BeaconSettingsApiModel>() {
-
-                @Override
-                public void onResponse(Call<BeaconSettingsApiModel> call, Response<BeaconSettingsApiModel> response) {
-                    if (response.isSuccessful()) {
-                        BeaconSettingsApiModel model = response.body();
-                        // Now you can use the Person object, which contains the parsed JSON data.
-                        Log.d("MyActivity", "DeviceInformationService API CALL: "+ model.Message +" :: " + model.Success);
-                        if(model.Data!=null){
-                            if(model.Data.getFirmware()!=null){
-                                firmwareSettings = model.Data.getFirmware();
-                            }
-                            if(model.Data.getAccelerometer()!=null){
-                                accelerometerSettings = model.Data.getAccelerometer();
-                            }
-                            if(model.Data.getSlots()!=null){
-                                slotSettings = model.Data.getSlots();
-                            }
-                            settingStatus = model.Data.getStatus();
-                        }
-                    } else {
-                        // Handle error
-                        Log.e(TAG, "DeviceInformationService API CALL: Error :: " + response.message());
-                    }
-                }
-                @Override
-                public void onFailure(Call<BeaconSettingsApiModel> call, Throwable t) {
-                    // Handle failure
-                    Log.e(TAG, "Error: " + t.getMessage());
-                }
-            });
-        }catch (Exception ex){
-            Log.e(TAG,ex.toString() );
-        }
-    }
+//    void getSlotSettings(){
+//        try {
+//            DeviceInformationService deviceInformationService = DeviceInformationClient.getApiService();
+//            Call<BeaconSettingsApiModel> call = deviceInformationService.getConfigurations(mDeviceMac.toUpperCase().replaceAll(":", ""), Configuration.Authorization);
+//            call.enqueue(new Callback<BeaconSettingsApiModel>() {
+//
+//                @Override
+//                public void onResponse(Call<BeaconSettingsApiModel> call, Response<BeaconSettingsApiModel> response) {
+//                    if (response.isSuccessful()) {
+//                        BeaconSettingsApiModel model = response.body();
+//                        // Now you can use the Person object, which contains the parsed JSON data.
+//                        Log.d("MyActivity", "DeviceInformationService API CALL: "+ model.Message +" :: " + model.Success);
+//                        if(model.Data!=null){
+//                            if(model.Data.getFirmware()!=null){
+//                                firmwareSettings = model.Data.getFirmware();
+//                            }
+//                            if(model.Data.getAccelerometer()!=null){
+//                                accelerometerSettings = model.Data.getAccelerometer();
+//                            }
+//                            if(model.Data.getSlots()!=null){
+//                                slotSettings = model.Data.getSlots();
+//                            }
+//                            settingStatus = model.Data.getStatus();
+//                        }
+//                    } else {
+//                        // Handle error
+//                        Log.e(TAG, "DeviceInformationService API CALL: Error :: " + response.message());
+//                    }
+//                }
+//                @Override
+//                public void onFailure(Call<BeaconSettingsApiModel> call, Throwable t) {
+//                    // Handle failure
+//                    Log.e(TAG, "Error: " + t.getMessage());
+//                }
+//            });
+//        }catch (Exception ex){
+//            Log.e(TAG,ex.toString() );
+//        }
+//    }
 
     @Subscribe(threadMode = ThreadMode.POSTING, priority = 100)
     public void onOrderTaskResponseEvent(OrderTaskResponseEvent event) {
@@ -429,7 +433,7 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
                                             stringBuffer.insert(14, ":");
                                             mDeviceMac = stringBuffer.toString().toUpperCase();
                                             deviceFragment.setMac(mDeviceMac);
-                                            getSlotSettings();
+                                            //getSlotSettings();
                                         }
                                         break;
                                     case KEY_SENSOR_TYPE:
@@ -841,7 +845,6 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
 
         try {
             //
-            BeaconDatabaseHelper databaseHelper = new BeaconDatabaseHelper(getApplicationContext());
             BeaconInformationModel beacon = databaseHelper.GetByMacAdrress(this.mDeviceMac.toString().toUpperCase().replaceAll(":", ""));
             if (beacon == null || TextUtils.isEmpty(beacon.getFirmwareUrl())) {
                 Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
@@ -971,6 +974,7 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
         String mac = !TextUtils.isEmpty(mDeviceMac) ?mDeviceMac : "";
         jsonMessage.addProperty("MacAddress",  mac);
         if (isUpgradeCompleted) {
+            databaseHelper.Delete(this.mDeviceMac.toString().toUpperCase().replaceAll(":", ""));
             jsonMessage.addProperty("Success",  true);
             jsonMessage.addProperty("Message",  "DFU Successfully");
             dialog.setMessage("DFU Successfully!\nPlease reconnect the device.");
@@ -993,7 +997,13 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
             setResult(RESULT_OK);
             finish();
         });
-        dialog.show(getSupportFragmentManager());
+        if(autoConnect) {
+            isUpgrading = false;
+            setResult(RESULT_OK);
+            finish();
+        }else{
+            dialog.show(getSupportFragmentManager());
+        }
     }
 
     private void reconnectOTADevice() {

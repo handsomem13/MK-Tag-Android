@@ -42,4 +42,5 @@ public class AppConstants {
     // result_code
     public static final int RESULT_CONN_DISCONNECTED = 2;
 
+    public static final String EXTRA_KEY_AUTOCONNECT = "EXTRA_KEY_AUTOCONNECT";
 }

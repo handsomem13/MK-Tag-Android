@@ -165,9 +165,9 @@ public class BeaconDatabaseHelper implements  ISqlite{
     }
 
     @Override
-    public <T> void Delete(String model) {
+    public <T> void Delete(String mac) {
         try {
-            int result = database.delete(SqliteHelper.TABLE_BEACONINFORMATION, SqliteHelper.BEACONINFO_COLUMN_MACADDRESS, new String[]{});
+            int result = database.delete(SqliteHelper.TABLE_BEACONINFORMATION, SqliteHelper.BEACONINFO_COLUMN_MACADDRESS+"=?", new String[]{mac});
         } catch (Exception e) {
             // Handle the exception
             Log.e("BeaconInformation",e.toString());
