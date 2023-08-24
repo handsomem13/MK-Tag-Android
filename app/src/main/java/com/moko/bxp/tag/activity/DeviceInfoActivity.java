@@ -206,40 +206,51 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
 
     }
     void checkPendingDfu(){
-        XLog.d(orderStatusCount+" Orders completed");
-        Handler handler = new Handler(Looper.getMainLooper());
-        if(updateFirmware && autoConnect && !reset){
-            handler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    //Do something after 100ms
-                    chooseFirmwareFile();
-                }
-            }, 1000);
-            return;
-        }
-        if(reset){
-            handler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    resetDevice();
-                }
-            }, 1000);
-            return;
-        }
-        BeaconInformationModel beacon = databaseHelper.GetByMacAdrress(mDeviceMac.toUpperCase().replaceAll(":", ""));
-        if (beacon != null && !TextUtils.isEmpty(beacon.getIsUpToDate()) && beacon.getIsUpToDate() != "true" && autoConnect) {
-            handler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    //Do something after 100ms
-                    chooseFirmwareFile();
-                }
-            }, 1000);
-        }else{
-            if(autoConnect){
-                finish();
+        try {
+            XLog.d(orderStatusCount+" Orders completed");
+            Toast.makeText(this, orderStatusCount+" Orders completed", Toast.LENGTH_SHORT).show();
+            Handler handler = new Handler(Looper.getMainLooper());
+            if(updateFirmware && autoConnect && !reset){
+                Toast.makeText(this, " Begin firmware upgrade", Toast.LENGTH_SHORT).show();
+                handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        //Do something after 100ms
+                        chooseFirmwareFile();
+                    }
+                }, 1000);
+                return;
             }
+            if(reset){
+                Toast.makeText(this, " Begin device reset", Toast.LENGTH_SHORT).show();
+                handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        resetDevice();
+                    }
+                }, 1000);
+                return;
+            }
+            Toast.makeText(this, " No update set, check devices", Toast.LENGTH_SHORT).show();
+            BeaconInformationModel beacon = databaseHelper.GetByMacAdrress(mDeviceMac.toUpperCase().replaceAll(":", ""));
+            if (beacon != null && !TextUtils.isEmpty(beacon.getIsUpToDate()) && beacon.getIsUpToDate() != "true" && autoConnect) {
+                handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        //Do something after 100ms
+                        chooseFirmwareFile();
+                    }
+                }, 1000);
+            }else{
+                if(autoConnect){
+                    Toast.makeText(this, " Close app", Toast.LENGTH_SHORT).show();
+                    finish();
+                }
+            }
+        }catch (Exception e) {
+            Toast.makeText(this,e.toString(),Toast.LENGTH_SHORT).show();
+            e.printStackTrace();
+            finish();
         }
     }
 //    void getSlotSettings(){
@@ -374,6 +385,11 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
                         dismissSyncProgressDialog();
                         finish();
                         break;
+                }
+                orderStatusCount++;
+                Toast.makeText(this, "Completed "+ orderStatusCount+"/4 tasks. ", Toast.LENGTH_SHORT).show();
+                if(orderStatusCount == 4){
+                    checkPendingDfu();
                 }
             }
             if (MokoConstants.ACTION_ORDER_FINISH.equals(action)) {
@@ -595,6 +611,7 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
                         break;
                 }
                 orderStatusCount++;
+                Toast.makeText(this, "Completed "+ orderStatusCount+"/4 tasks. ", Toast.LENGTH_SHORT).show();
                 if(orderStatusCount == 4){
                     checkPendingDfu();
                 }
@@ -1045,84 +1062,106 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
     private ProgressDialog mDFUDialog;
 
     private void showDFUProgressDialog(String tips) {
-        mDFUDialog = new ProgressDialog(DeviceInfoActivity.this);
-        mDFUDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        mDFUDialog.setCanceledOnTouchOutside(false);
-        mDFUDialog.setCancelable(false);
-        mDFUDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
-        mDFUDialog.setMessage(tips);
-        if (!isFinishing() && mDFUDialog != null && !mDFUDialog.isShowing()) {
-            mDFUDialog.show();
+        try {
+            mDFUDialog = new ProgressDialog(DeviceInfoActivity.this);
+            mDFUDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+            mDFUDialog.setCanceledOnTouchOutside(false);
+            mDFUDialog.setCancelable(false);
+            mDFUDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+            mDFUDialog.setMessage(tips);
+            if (!isFinishing() && mDFUDialog != null && !mDFUDialog.isShowing()) {
+                mDFUDialog.show();
+            }
+        }catch (Exception e) {
+            Toast.makeText(this,e.toString(),Toast.LENGTH_SHORT).show();
+            e.printStackTrace();
         }
     }
 
     private void dismissDFUProgressDialog() {
-        Handler handler = new Handler(Looper.getMainLooper());
-        if (!isFinishing() && mDFUDialog != null && mDFUDialog.isShowing()) {
-            mDFUDialog.dismiss();
-        }
-        AlertMessageDialog dialog = new AlertMessageDialog();
-        JsonObject jsonMessage = new JsonObject();
-        String mac = !TextUtils.isEmpty(mDeviceMac) ?mDeviceMac : "";
-        jsonMessage.addProperty("MacAddress",  mac);
-        if (isUpgradeCompleted) {
-            databaseHelper.Delete(this.mDeviceMac.toString().toUpperCase().replaceAll(":", ""));
-            jsonMessage.addProperty("Success",  true);
-            jsonMessage.addProperty("Message",  "DFU Successfully");
-            dialog.setMessage("DFU Successfully!\nPlease reconnect the device.");
-        } else {
-            jsonMessage.addProperty("Success",  false);
-            jsonMessage.addProperty("Message",  "DFU Failed");
-            dialog.setMessage("Opps!DFU Failed.\nPlease try again!");
-        }
-        DfuMqttClient dfuMqttClient = new DfuMqttClient(getApplicationContext(),jsonMessage,mac);
         try {
-            dfuMqttClient.execute().get();
-        } catch (Exception e) {
-            Log.e(TAG,e.toString());
+            Handler handler = new Handler(Looper.getMainLooper());
+            if (!isFinishing() && mDFUDialog != null && mDFUDialog.isShowing()) {
+                mDFUDialog.dismiss();
+            }
+            AlertMessageDialog dialog = new AlertMessageDialog();
+            JsonObject jsonMessage = new JsonObject();
+            String mac = !TextUtils.isEmpty(mDeviceMac) ?mDeviceMac : "";
+            jsonMessage.addProperty("MacAddress",  mac);
+            if (isUpgradeCompleted) {
+                databaseHelper.Delete(this.mDeviceMac.toString().toUpperCase().replaceAll(":", ""));
+                jsonMessage.addProperty("Success",  true);
+                jsonMessage.addProperty("Message",  "DFU Successfully");
+                dialog.setMessage("DFU Successfully!\nPlease reconnect the device.");
+                Toast.makeText(this, "DFU Successfully!\nPlease reconnect the device.", Toast.LENGTH_SHORT).show();
+            } else {
+                jsonMessage.addProperty("Success",  false);
+                jsonMessage.addProperty("Message",  "DFU Failed");
+                dialog.setMessage("Opps!DFU Failed.\nPlease try again!");
+                Toast.makeText(this, "Opps!DFU Failed.\nPlease try again!", Toast.LENGTH_SHORT).show();
+            }
+            DfuMqttClient dfuMqttClient = new DfuMqttClient(getApplicationContext(),jsonMessage,mac);
+            try {
+                dfuMqttClient.execute().get();
+            } catch (Exception e) {
+                Log.e(TAG,e.toString());
+                e.printStackTrace();
+            }
+            dialog.setCancelGone();
+            dialog.setConfirm(R.string.ok);
+            dialog.setOnAlertConfirmListener(() -> {
+                isUpgrading = false;
+                setResult(RESULT_OK);
+                handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        finish();
+                    }
+                }, 1000);
+            });
+            if(autoConnect) {
+                isUpgrading = false;
+                setResult(RESULT_OK);
+                handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        finish();
+                    }
+                }, 1000);
+            }else{
+                dialog.show(getSupportFragmentManager());
+            }
+        }catch (Exception e) {
+            Toast.makeText(this,e.toString(),Toast.LENGTH_SHORT).show();
             e.printStackTrace();
-        }
-        dialog.setCancelGone();
-        dialog.setConfirm(R.string.ok);
-        dialog.setOnAlertConfirmListener(() -> {
-            isUpgrading = false;
-            setResult(RESULT_OK);
-            handler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    finish();
-                }
-            }, 1000);
-        });
-        if(autoConnect) {
-            isUpgrading = false;
-            setResult(RESULT_OK);
-            handler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    finish();
-                }
-            }, 1000);
-        }else{
-            dialog.show(getSupportFragmentManager());
         }
     }
 
     private void reconnectOTADevice() {
-        tvTitle.postDelayed(() -> {
-            if (mDFUDialog != null && mDFUDialog.isShowing())
-                mDFUDialog.setMessage("DeviceConnecting...");
-            MokoSupport.getInstance().connDevice(mDeviceMac);
-        }, 4000);
+        try {
+            tvTitle.postDelayed(() -> {
+                if (mDFUDialog != null && mDFUDialog.isShowing())
+                    mDFUDialog.setMessage("DeviceConnecting...");
+                MokoSupport.getInstance().connDevice(mDeviceMac);
+            }, 4000);
+        }catch (Exception e) {
+            Toast.makeText(this,e.toString(),Toast.LENGTH_SHORT).show();
+            e.printStackTrace();
+        }
     }
 
     // 1.
     private void otaBegin() {
         //Writing 0x00 to control characteristic to DFU mode  target device begins OTA process
-        tvTitle.postDelayed(() -> {
-            XLog.i("OTA BEGIN");
-            MokoSupport.getInstance().sendOrder(OrderTaskAssembler.startDFU());
-        }, 500);
+        try {
+            tvTitle.postDelayed(() -> {
+                XLog.i("OTA BEGIN");
+                MokoSupport.getInstance().sendOrder(OrderTaskAssembler.startDFU());
+            }, 500);
+        }catch (Exception e) {
+            Toast.makeText(this,e.toString(),Toast.LENGTH_SHORT).show();
+            e.printStackTrace();
+        }
     }
 
     // 2.

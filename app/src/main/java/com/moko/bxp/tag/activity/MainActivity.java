@@ -69,6 +69,7 @@ import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -114,9 +115,9 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
     private BeaconDatabaseHelper databaseHelper ;
     private boolean updateFirmware = false;
 
-    private String[] passwords = new String[] { "Moko4321", "S3th4141976" ,"S3th4l41976"};
+    private String[] passwords = new String[] { "S3th4141976" ,"Moko4321", "S3th4l41976"};
     private List<String> triedPassword =  new ArrayList<>();
-    public boolean cbAutoConnect = false;
+    public boolean cbAutoConnect = true;
     public boolean requestFirmware;
     public boolean resetDevice;
 
@@ -174,6 +175,15 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
     }
     private void  syncDevices(){
         try {
+            if(cbAutoConnect){
+                mokoBleScanner.stopScanDevice();
+                onStopScan();
+            }
+        }catch (Exception e){
+            Toast.makeText(this, e.toString(), Toast.LENGTH_SHORT).show();
+        }
+        try {
+
             DeviceInformationService deviceInformationService = DeviceInformationClient.getApiService();
             Call<DeviceModel> call = deviceInformationService.getDevices(Configuration.Authorization);
             call.enqueue(new Callback<DeviceModel>() {
@@ -254,6 +264,8 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                     isPasswordError = false;
                 } else {
                     ToastUtils.showToast(MainActivity.this, "Connection failed");
+                    dismissLoadingMessageDialog();
+                    dismissLoadingProgressDialog();
                 }
                 startScan();
             }
@@ -283,6 +295,8 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
     public void onOrderTaskResponseEvent(OrderTaskResponseEvent event) {
         final String action = event.getAction();
         if (MokoConstants.ACTION_ORDER_TIMEOUT.equals(action)) {
+            dismissLoadingMessageDialog();
+            dismissLoadingProgressDialog();
         }
         if (MokoConstants.ACTION_ORDER_FINISH.equals(action)) {
             dismissLoadingMessageDialog();
@@ -321,6 +335,12 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                                         i.putExtra(AppConstants.EXTRA_KEY_AUTOCONNECT, cbAutoConnect&&updateFirmware);
                                         i.putExtra(AppConstants.EXTRA_KEY_RESETDEVICE , resetDevice);
                                         i.putExtra(AppConstants.EXTRA_KEY_REQUESTFIRMWARE , requestFirmware);
+                                        runOnUiThread(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                dismissLoadingMessageDialog();
+                                            }
+                                        });
                                         startActivityForResult(i, AppConstants.REQUEST_CODE_DEVICE_INFO);
                                     }
                                     break;
@@ -352,6 +372,12 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                                             Log.e(this.getLocalClassName(),e.toString());
                                             e.printStackTrace();
                                         }
+                                        runOnUiThread(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                dismissLoadingMessageDialog();
+                                            }
+                                        });
                                         startActivityForResult(i, AppConstants.REQUEST_CODE_DEVICE_INFO);
                                     } else {
                                         isPasswordError = true;
@@ -432,8 +458,14 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
 
     @Override
     public void onStopScan() {
-        findViewById(R.id.iv_refresh).clearAnimation();
-        animation = null;
+        try {
+            findViewById(R.id.iv_refresh).clearAnimation();
+            animation = null;
+            dismissLoadingMessageDialog();
+            dismissLoadingProgressDialog();
+        }catch (Exception e){
+            Toast.makeText(this,  e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
@@ -499,7 +531,7 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                             mHandler.removeMessages(0);
                             mokoBleScanner.stopScanDevice();
                         }
-                        connectDevice();
+                        connectDevice(advInfo);
                         break;
                     }
                 }
@@ -526,6 +558,12 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
     public  boolean pendingUpdates = true;
 
     private void startScan() {
+        try {
+            dismissLoadingMessageDialog();
+            dismissLoadingProgressDialog();
+        }catch (Exception ex){
+            ex.printStackTrace();
+        }
         try {
             tv_ErrorMessage.setText("");
             if (!MokoSupport.getInstance().isBluetoothOpen()) {
@@ -591,6 +629,13 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
         back();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Date d = new Date();
+        XLog.d("resuming main screen at "+ d.toString());
+    }
+
     private String mPassword;
     private String mSavedPassword;
     private String mSelectedDeviceMac;
@@ -609,12 +654,21 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                 mokoBleScanner.stopScanDevice();
             }
             mSelectedDeviceMac = advInfo.mac;
-            connectDevice();
+            connectDevice(advInfo);
         }
     }
-    void connectDevice(){
+    void connectDevice(AdvInfo advInfo){
         requestFirmware = false;
         resetDevice = false;
+        //AdvInfo{name='Sethala M4 113', mac='B4:35:22:60:D5:49'}
+        if(advInfo!=null && advInfo.name!=null && advInfo.name.toLowerCase().contains("sethala m4 113")){
+            passwords = new String[] { "S3th4l41976", "Moko4321" , "S3th4141976"};
+        }
+        else if(advInfo!=null && advInfo.name!=null && advInfo.name.toLowerCase().contains("mk tag")){
+            passwords = new String[] { "Moko4321" , "S3th4141976","S3th4l41976" };
+        }else{
+            passwords = new String[] {  "S3th4141976","Moko4321", "S3th4l41976" };
+        }
         BeaconInformationModel beacon = databaseHelper.GetByMacAdrress(mSelectedDeviceMac.toUpperCase().replaceAll(":", ""));
         if (beacon != null && !TextUtils.isEmpty(beacon.getIsUpToDate()) && beacon.getIsUpToDate()!="true" ) {
             updateFirmware = true;
@@ -641,6 +695,7 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                 mPassword = passwords[triedPassword.size()];
                 XLog.i(mPassword);
                 triedPassword.add(mPassword);
+                showLoadingProgressDialog();
                 ivRefresh.postDelayed(() -> MokoSupport.getInstance().connDevice(mSelectedDeviceMac), 500);
                 return;
             }catch (Exception x) {
