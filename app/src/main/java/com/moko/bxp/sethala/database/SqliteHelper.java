@@ -7,7 +7,7 @@ import android.util.Log;
 
 public class SqliteHelper  extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "SethalaBleTool.db";
-    private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 5;
 
     public static final String COLUMN_ID = "Id";
 
@@ -26,6 +26,8 @@ public class SqliteHelper  extends SQLiteOpenHelper {
     public static final String BEACONINFO_COLUMN_ISUPTODATE= "IsUpToDate";
     public static final String BEACONINFO_COLUMN_PASSWORD= "Password";
     public static final String BEACONINFO_COLUMN_FIRMWAREURL= "FirmwareUrl";
+    public static final String BEACONINFO_COLUMN_REQUESTFIRMWARE= "RequestFirmware";
+    public static final String BEACONINFO_COLUMN_RESET= "Reset";
     private String BeaconInformationTable = "Create table " + TABLE_BEACONINFORMATION + "("
             + COLUMN_ID + " integer primary key autoincrement, "
             + BEACONINFO_COLUMN_ASSETID + " text, "
@@ -40,6 +42,8 @@ public class SqliteHelper  extends SQLiteOpenHelper {
             + BEACONINFO_COLUMN_ISUPTODATE + " text, "
             + BEACONINFO_COLUMN_PASSWORD + " text, "
             + BEACONINFO_COLUMN_FIRMWAREURL + " text, "
+            + BEACONINFO_COLUMN_REQUESTFIRMWARE + " text, "
+            + BEACONINFO_COLUMN_RESET + " text, "
             + BEACONINFO_COLUMN_LASTUPDATEDTIMESTAMP + " text "
             + ")";
 

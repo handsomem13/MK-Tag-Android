@@ -21,6 +21,7 @@ import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.elvishew.xlog.XLog;
@@ -111,11 +112,13 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
     private boolean isVerifyPassword;
     private List<BeaconInformationModel> pendingInstallations  =  new ArrayList<>();
     private BeaconDatabaseHelper databaseHelper ;
-    private boolean updateFirmware;
+    private boolean updateFirmware = false;
 
     private String[] passwords = new String[] { "Moko4321", "S3th4141976" ,"S3th4l41976"};
     private List<String> triedPassword =  new ArrayList<>();
     public boolean cbAutoConnect = false;
+    public boolean requestFirmware;
+    public boolean resetDevice;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -185,6 +188,7 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                         if(model.Data.size()>0){
                             databaseHelper.insertMany(model.Data);
                         }
+                        startScan();
                     } else {
                         // Handle error
                         Log.e("MyActivity", "DeviceInformationService API CALL: Error :: " + response.message());
@@ -315,6 +319,8 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                                         i.putExtra(AppConstants.EXTRA_KEY_PASSWORD_VERIFICATION, false);
                                         i.putExtra(AppConstants.EXTRA_KEY_UPDATE_FIRMWARE , updateFirmware);
                                         i.putExtra(AppConstants.EXTRA_KEY_AUTOCONNECT, cbAutoConnect&&updateFirmware);
+                                        i.putExtra(AppConstants.EXTRA_KEY_RESETDEVICE , resetDevice);
+                                        i.putExtra(AppConstants.EXTRA_KEY_REQUESTFIRMWARE , requestFirmware);
                                         startActivityForResult(i, AppConstants.REQUEST_CODE_DEVICE_INFO);
                                     }
                                     break;
@@ -332,6 +338,8 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
                                         Intent i = new Intent(this, DeviceInfoActivity.class);
                                         i.putExtra(AppConstants.EXTRA_KEY_PASSWORD_VERIFICATION, true);
                                         i.putExtra(AppConstants.EXTRA_KEY_UPDATE_FIRMWARE , updateFirmware);
+                                        i.putExtra(AppConstants.EXTRA_KEY_RESETDEVICE , resetDevice);
+                                        i.putExtra(AppConstants.EXTRA_KEY_REQUESTFIRMWARE , requestFirmware);
                                         i.putExtra(AppConstants.EXTRA_KEY_AUTOCONNECT, cbAutoConnect&&updateFirmware);
                                         try {
                                             JsonObject jsonMessage = new JsonObject();
@@ -481,14 +489,20 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
             advInfoList.addAll(advInfoHashMap.values());
         }
         if(cbAutoConnect==true && pendingUpdates && advInfoList.size()>0){
-            final AdvInfo advInfo = (AdvInfo) adapter.getItem(0);
-            if (advInfo != null && !isFinishing()) {
-                if (animation != null) {
-                    mHandler.removeMessages(0);
-                    mokoBleScanner.stopScanDevice();
+            for (int i= 0 ; i<adapter.getData().size() ; i++ ) {
+                AdvInfo advInfo= adapter.getItem(i);
+                if (advInfo != null && !isFinishing()) {
+                    mSelectedDeviceMac = advInfo.mac;
+                    BeaconInformationModel beacon = databaseHelper.GetByMacAdrress(mSelectedDeviceMac.toUpperCase().replaceAll(":", ""));
+                    if (beacon != null && !TextUtils.isEmpty(beacon.getIsUpToDate()) && beacon.getIsUpToDate() != "true") {
+                        if (animation != null) {
+                            mHandler.removeMessages(0);
+                            mokoBleScanner.stopScanDevice();
+                        }
+                        connectDevice();
+                        break;
+                    }
                 }
-                mSelectedDeviceMac = advInfo.mac;
-                connectDevice();
             }
         }
         System.setProperty("java.util.Arrays.useLegacyMergeSort", "true");
@@ -509,34 +523,39 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
     public String filterName;
     public String filterMac;
     public int filterRssi = -100;
-    public  boolean pendingUpdates = false;
+    public  boolean pendingUpdates = true;
 
     private void startScan() {
-        tv_ErrorMessage.setText("");
-        if (!MokoSupport.getInstance().isBluetoothOpen()) {
-            // 蓝牙未打开，开启蓝牙
-            MokoSupport.getInstance().enableBluetooth();
-            tv_ErrorMessage.setText("Bluetooth is not enabled");
-            return;
-        }
-        animation = AnimationUtils.loadAnimation(this, R.anim.rotate_refresh);
-        findViewById(R.id.iv_refresh).startAnimation(animation);
-        advInfoAnalysisImpl = new AdvInfoAnalysisImpl();
-        if(pendingUpdates ){
-            pendingInstallations = databaseHelper.GetAll();
-            ArrayList<String> beacons =    new ArrayList<>();
-            for (BeaconInformationModel beacon: pendingInstallations                 ) {
-                beacons.add(beacon.getMacAddress());
-            }
-            if(beacons.size()==0){
-                tv_ErrorMessage.setText("Checking for update. No pending updates found");
+        try {
+            tv_ErrorMessage.setText("");
+            if (!MokoSupport.getInstance().isBluetoothOpen()) {
+                // 蓝牙未打开，开启蓝牙
+                MokoSupport.getInstance().enableBluetooth();
+                tv_ErrorMessage.setText("Bluetooth is not enabled");
                 return;
             }
-            mokoBleScanner.setBeaconList(beacons);
-        }else{
-            mokoBleScanner.setBeaconList(null);
+            animation = AnimationUtils.loadAnimation(this, R.anim.rotate_refresh);
+            findViewById(R.id.iv_refresh).startAnimation(animation);
+            advInfoAnalysisImpl = new AdvInfoAnalysisImpl();
+            if(pendingUpdates ){
+                pendingInstallations = databaseHelper.GetAll();
+                ArrayList<String> beacons =    new ArrayList<>();
+                for (BeaconInformationModel beacon: pendingInstallations) {
+                    beacons.add(beacon.getMacAddress());
+                }
+                if(beacons.size()==0){
+                    tv_ErrorMessage.setText("Checking for update. No pending updates found");
+                    return;
+                }
+                mokoBleScanner.setBeaconList(beacons);
+            }else{
+                mokoBleScanner.setBeaconList(null);
+            }
+            mokoBleScanner.startScanDevice(this);
+        }catch (Exception ex){
+            Toast.makeText(this, ex.getMessage(),Toast.LENGTH_SHORT).show();
+            ex.printStackTrace();
         }
-        mokoBleScanner.startScanDevice(this);
     }
 
 
@@ -594,10 +613,16 @@ public class MainActivity extends BaseActivity implements MokoScanDeviceCallback
         }
     }
     void connectDevice(){
-        BeaconDatabaseHelper databaseHelper = new BeaconDatabaseHelper(this.getApplicationContext());
+        requestFirmware = false;
+        resetDevice = false;
         BeaconInformationModel beacon = databaseHelper.GetByMacAdrress(mSelectedDeviceMac.toUpperCase().replaceAll(":", ""));
         if (beacon != null && !TextUtils.isEmpty(beacon.getIsUpToDate()) && beacon.getIsUpToDate()!="true" ) {
             updateFirmware = true;
+            boolean firmware = beacon.getRequestFirmware().equals("true");
+            if(beacon.getRequestFirmware().equals("true"))
+                requestFirmware = true;
+            if(beacon.getReset().equals("true"))
+                resetDevice = true;
         }else{
             updateFirmware = false;
         }

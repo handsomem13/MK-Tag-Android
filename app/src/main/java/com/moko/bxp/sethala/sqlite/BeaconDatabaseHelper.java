@@ -57,6 +57,8 @@ public class BeaconDatabaseHelper implements  ISqlite{
                 _model.setIsUpToDate(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_ISUPTODATE)));
                 _model.setPassword(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_PASSWORD)));
                 _model.setFirmwareUrl(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_FIRMWAREURL)));
+                _model.setReset(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_RESET)));
+                _model.setRequestFirmware(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_REQUESTFIRMWARE)));
             } while (cursor.moveToNext());
         }
         return type.cast(_model);
@@ -82,6 +84,8 @@ public class BeaconDatabaseHelper implements  ISqlite{
                 _model.setIsUpToDate(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_ISUPTODATE)));
                 _model.setPassword(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_PASSWORD)));
                 _model.setFirmwareUrl(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_FIRMWAREURL)));
+                _model.setReset(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_RESET)));
+                _model.setRequestFirmware(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_REQUESTFIRMWARE)));
             } while (cursor.moveToNext());
         }
         return _model;
@@ -110,6 +114,8 @@ public class BeaconDatabaseHelper implements  ISqlite{
                    _model.setPassword(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_PASSWORD)));
                    _model.setFirmwareUrl(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_FIRMWAREURL)));
                    _model.setThingName(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_THINGNAME)));
+                   _model.setReset(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_RESET)));
+                   _model.setRequestFirmware(cursor.getString(cursor.getColumnIndex(SqliteHelper.BEACONINFO_COLUMN_REQUESTFIRMWARE)));
                    data.add(_model);
                } while (cursor.moveToNext());
            }
@@ -139,6 +145,8 @@ public class BeaconDatabaseHelper implements  ISqlite{
             values.put(SqliteHelper.BEACONINFO_COLUMN_PASSWORD,_model.getPassword());
             values.put(SqliteHelper.BEACONINFO_COLUMN_FIRMWAREURL,_model.getFirmwareUrl());
             values.put(SqliteHelper.BEACONINFO_COLUMN_THINGNAME,_model.getThingName());
+            values.put(SqliteHelper.BEACONINFO_COLUMN_RESET,_model.getReset());
+            values.put(SqliteHelper.BEACONINFO_COLUMN_REQUESTFIRMWARE,_model.getRequestFirmware());
             long rowId = database.insert(SqliteHelper.TABLE_BEACONINFORMATION, null, values);
             CloseDatabaseConnection();
             Log.i("Add", rowId+" Created successfully");

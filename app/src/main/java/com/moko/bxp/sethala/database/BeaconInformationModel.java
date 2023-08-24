@@ -14,6 +14,25 @@ public class BeaconInformationModel {
     private String DateTimeStamp;
     private String LastUpdatedDateTimeStamp;
     private String IsUpToDate;
+    private String Reset;
+    private String RequestFirmware;
+
+    public String getReset() {
+        return Reset;
+    }
+
+    public void setReset(String reset) {
+        Reset = reset;
+    }
+
+    public String getRequestFirmware() {
+        return RequestFirmware;
+    }
+
+    public void setRequestFirmware(String requestFirmware) {
+        RequestFirmware = requestFirmware;
+    }
+
     private String Password;
     private String FirmwareUrl;
     public String getIsUpToDate() {

@@ -11,6 +11,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -33,6 +35,8 @@ import com.moko.ble.lib.utils.MokoUtils;
 import com.moko.bxp.sethala.clients.Configuration;
 import com.moko.bxp.sethala.clients.DeviceInformationClient;
 import com.moko.bxp.sethala.clients.DfuMqttClient;
+import com.moko.bxp.sethala.clients.FirmwareMqttClient;
+import com.moko.bxp.sethala.clients.ResetMqttClient;
 import com.moko.bxp.sethala.database.BeaconInformationModel;
 import com.moko.bxp.sethala.interfaces.DeviceInformationService;
 import com.moko.bxp.sethala.models.AccelerometerSettings;
@@ -115,7 +119,9 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
     private  String settingStatus;
     public boolean updateFirmware;
     private boolean autoConnect;
-
+    private boolean requestFirmware;
+    private boolean reset;
+    private int orderStatusCount = 0;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -126,6 +132,8 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
         isVerifyPassword = getIntent().getBooleanExtra(AppConstants.EXTRA_KEY_PASSWORD_VERIFICATION, false);
         updateFirmware =  getIntent().getBooleanExtra(AppConstants.EXTRA_KEY_UPDATE_FIRMWARE, false);
         autoConnect =  getIntent().getBooleanExtra(AppConstants.EXTRA_KEY_AUTOCONNECT, false);
+        reset =  getIntent().getBooleanExtra(AppConstants.EXTRA_KEY_RESETDEVICE, false);
+        requestFirmware =  getIntent().getBooleanExtra(AppConstants.EXTRA_KEY_REQUESTFIRMWARE, false);
         enablePasswordVerify = isVerifyPassword;
         initFragment();
         rgOptions.setOnCheckedChangeListener(this);
@@ -148,6 +156,7 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
         orderTasks.add(OrderTaskAssembler.getDeviceMac());
         orderTasks.add(OrderTaskAssembler.getSensorType());
         orderTasks.add(OrderTaskAssembler.getHallPowerEnable());
+        orderStatusCount = 0;
         MokoSupport.getInstance().sendOrder(orderTasks.toArray(new OrderTask[]{}));
     }
 
@@ -197,8 +206,40 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
 
     }
     void checkPendingDfu(){
-        if(updateFirmware){
-           chooseFirmwareFile();
+        XLog.d(orderStatusCount+" Orders completed");
+        Handler handler = new Handler(Looper.getMainLooper());
+        if(updateFirmware && autoConnect && !reset){
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    //Do something after 100ms
+                    chooseFirmwareFile();
+                }
+            }, 1000);
+            return;
+        }
+        if(reset){
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    resetDevice();
+                }
+            }, 1000);
+            return;
+        }
+        BeaconInformationModel beacon = databaseHelper.GetByMacAdrress(mDeviceMac.toUpperCase().replaceAll(":", ""));
+        if (beacon != null && !TextUtils.isEmpty(beacon.getIsUpToDate()) && beacon.getIsUpToDate() != "true" && autoConnect) {
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    //Do something after 100ms
+                    chooseFirmwareFile();
+                }
+            }, 1000);
+        }else{
+            if(autoConnect){
+                finish();
+            }
         }
     }
 //    void getSlotSettings(){
@@ -253,6 +294,7 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
                 byte[] value = response.responseValue;
                 switch (orderCHAR) {
                     case CHAR_DISCONNECT:
+                        Handler handler = new Handler(Looper.getMainLooper());
                         if (value.length == 5) {
                             mDisconnectType = value[4] & 0xff;
                             if (mDisconnectType == 2 && isModifyPassword) {
@@ -264,19 +306,40 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
                                 dialog.setConfirm(R.string.ok);
                                 dialog.setOnAlertConfirmListener(() -> {
                                     setResult(RESULT_OK);
-                                    finish();
                                 });
                                 dialog.show(getSupportFragmentManager());
                             } else if (mDisconnectType == 3) {
+                                dismissSyncProgressDialog();
+                                Toast.makeText(this, "Reset success!\nBeacon is disconnected.", Toast.LENGTH_SHORT).show();
+                                JsonObject jsonMessage = new JsonObject();
+                                String mac = !TextUtils.isEmpty(mDeviceMac) ?mDeviceMac : "";
+                                jsonMessage.addProperty("MacAddress",  mac);
+                                ResetMqttClient dfuMqttClient = new ResetMqttClient(getApplicationContext(),jsonMessage,mac);
+                                try {
+                                    Boolean result = dfuMqttClient.execute().get();
+                                    if(reset){
+                                        finish();
+                                    }
+                                } catch (Exception e) {
+                                    Log.e(TAG,e.toString());
+                                    e.printStackTrace();
+                                }
                                 AlertMessageDialog dialog = new AlertMessageDialog();
                                 dialog.setMessage("Reset success!\nBeacon is disconnected.");
                                 dialog.setCancelGone();
                                 dialog.setConfirm(R.string.ok);
                                 dialog.setOnAlertConfirmListener(() -> {
                                     setResult(RESULT_OK);
-                                    finish();
+                                    handler.postDelayed(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            finish();
+                                        }
+                                    }, 1000);
                                 });
-                                dialog.show(getSupportFragmentManager());
+                                if(!reset){
+                                    dialog.show(getSupportFragmentManager());
+                                }
                             } else if (mDisconnectType == 4) {
                                 AlertMessageDialog dialog = new AlertMessageDialog();
                                 dialog.setTitle("Dismiss");
@@ -285,7 +348,12 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
                                 dialog.setCancelGone();
                                 dialog.setOnAlertConfirmListener(() -> {
                                     setResult(RESULT_OK);
-                                    finish();
+                                    handler.postDelayed(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            finish();
+                                        }
+                                    }, 1000);
                                 });
                                 dialog.show(getSupportFragmentManager());
                             }
@@ -303,12 +371,13 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
                     case CHAR_OTA_DATA:
                         ToastUtils.showToast(this, "Error:DFU Failed!");
                         MokoSupport.getInstance().disConnectBle();
+                        dismissSyncProgressDialog();
+                        finish();
                         break;
                 }
             }
             if (MokoConstants.ACTION_ORDER_FINISH.equals(action)) {
                 dismissSyncProgressDialog();
-                checkPendingDfu();
             }
             if (MokoConstants.ACTION_ORDER_RESULT.equals(action)) {
                 OrderTaskResponse response = event.getResponse();
@@ -492,6 +561,24 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
                         deviceFragment.setModelNumber(value);
                         break;
                     case CHAR_SOFTWARE_REVISION:
+                        String revision =new String(value).trim();
+                        JsonObject jsonMessage = new JsonObject();
+                        Handler handler = new Handler(Looper.getMainLooper());
+                        String mac = !TextUtils.isEmpty(mDeviceMac) ?mDeviceMac : "";
+                        jsonMessage.addProperty("MacAddress",  mac);
+                        jsonMessage.addProperty("SoftwareVersion",  revision);
+                        handler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                FirmwareMqttClient dfuMqttClient = new FirmwareMqttClient(getApplicationContext(),jsonMessage,mac);
+                                try {
+                                    dfuMqttClient.execute();
+                                } catch (Exception e) {
+                                    Log.e(TAG,e.toString());
+                                    e.printStackTrace();
+                                }
+                            }
+                        }, 50);
                         deviceFragment.setSoftwareRevision(value);
                         break;
                     case CHAR_FIRMWARE_REVISION:
@@ -506,6 +593,10 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
                     case CHAR_MANUFACTURER_NAME:
                         deviceFragment.setManufacturer(value);
                         break;
+                }
+                orderStatusCount++;
+                if(orderStatusCount == 4){
+                    checkPendingDfu();
                 }
             }
         });
@@ -966,6 +1057,7 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
     }
 
     private void dismissDFUProgressDialog() {
+        Handler handler = new Handler(Looper.getMainLooper());
         if (!isFinishing() && mDFUDialog != null && mDFUDialog.isShowing()) {
             mDFUDialog.dismiss();
         }
@@ -985,7 +1077,7 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
         }
         DfuMqttClient dfuMqttClient = new DfuMqttClient(getApplicationContext(),jsonMessage,mac);
         try {
-            dfuMqttClient.execute();
+            dfuMqttClient.execute().get();
         } catch (Exception e) {
             Log.e(TAG,e.toString());
             e.printStackTrace();
@@ -995,12 +1087,22 @@ public class DeviceInfoActivity extends BaseActivity implements RadioGroup.OnChe
         dialog.setOnAlertConfirmListener(() -> {
             isUpgrading = false;
             setResult(RESULT_OK);
-            finish();
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    finish();
+                }
+            }, 1000);
         });
         if(autoConnect) {
             isUpgrading = false;
             setResult(RESULT_OK);
-            finish();
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    finish();
+                }
+            }, 1000);
         }else{
             dialog.show(getSupportFragmentManager());
         }

@@ -6,23 +6,17 @@ import android.util.Log;
 
 import com.google.gson.JsonObject;
 
-import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.client.mqttv3.DisconnectedBufferOptions;
-import org.eclipse.paho.client.mqttv3.IMqttActionListener;
-import org.eclipse.paho.client.mqttv3.IMqttToken;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
-import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
-import java.io.UnsupportedEncodingException;
-
-public class DfuMqttClient extends AsyncTask<String, Void, Boolean> {
+public class ResetMqttClient extends AsyncTask<String, Void, Boolean> {
     private Context context;
     private JsonObject body;
     private String macAddress;
-    public DfuMqttClient(Context context, JsonObject body, String macAddress) {
+    public ResetMqttClient(Context context, JsonObject body, String macAddress) {
         this.context = context;
         this.body = body;
         this.macAddress = macAddress.toUpperCase().replaceAll(":", "");
@@ -46,7 +40,7 @@ public class DfuMqttClient extends AsyncTask<String, Void, Boolean> {
                     byte[] encodedPayload = new byte[0];
                     encodedPayload = msg.getBytes("UTF-8");
                     MqttMessage message = new MqttMessage(encodedPayload);
-                    client.publish(Configuration.MqttTopic+ "dfu/"+ macAddress , message);
+                    client.publish(Configuration.MqttTopic+ "reset/"+ macAddress , message);
                     client.disconnect();
                 } catch (Exception e) {
                     Log.e("publishDfuResult", e.getMessage());

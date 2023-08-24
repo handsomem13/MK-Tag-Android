@@ -43,4 +43,6 @@ public class AppConstants {
     public static final int RESULT_CONN_DISCONNECTED = 2;
 
     public static final String EXTRA_KEY_AUTOCONNECT = "EXTRA_KEY_AUTOCONNECT";
+    public static final String EXTRA_KEY_RESETDEVICE = "EXTRA_KEY_RESETDEVICE";
+    public static final String EXTRA_KEY_REQUESTFIRMWARE = "EXTRA_KEY_REQUESTFIRMWARE";
 }
